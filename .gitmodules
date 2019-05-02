@@ -1,0 +1,6 @@
+[submodule "Libraries/AStar"]
+	path = Libraries/AStar
+	url = https://github.com/zhb94430/AStar
+[submodule "Libraries/pddlparser-pp"]
+	path = Libraries/pddlparser-pp
+	url = https://github.com/thiagopbueno/pddlparser-pp
