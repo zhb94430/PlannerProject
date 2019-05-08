@@ -4,6 +4,7 @@
 #include <string>
 #include <functional>
 #include <stack>
+#include <algorithm>
 
 #include "./Libraries/AStar/AStar.h"
 #include "./Libraries/AStar/Graph/Node.h"
@@ -57,8 +58,26 @@ PNode Planner::GeneratePNodeFrom(Action action, PNode* currentPNode)
 	LiteralList resultList = currentPNode->state;
 
 	// Apply action effect to currentPNode state
-	resultList.append(action->EffectList);
-	resultList.removeOppsite();
+	// by appending effects and remove duplicates
+	resultList.insert(resultList.end(), action->EffectList.begin(), action->EffectList.end());
+	
+	auto end = resultList.end();
+	for (auto const& literal : resultList) 
+	{
+		// Remove duplicates
+		end = std::remove(literal + 1, end, literal);
+
+		// Find opposite and remove opposite duplicates
+		auto literalOpposite = Literal(literal.first, !literal.second);
+		bool containsOpposite = std::find(resultList.begin(), resultList.end(), literalOpposite) != resultList.end();
+
+		if (containsOpposite)
+		{
+			end = std::remove(literal + 1, end, literalOpposite);
+			end = std::replace(literal, literal, literalOpposite);
+		}
+	}
+	resultList.erase(end, resultList.end());
 
 	// Return altered currentPNode
 	PNode resultNode(resultList);
