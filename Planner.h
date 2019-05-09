@@ -6,8 +6,11 @@
 #include <stack>
 #include <algorithm>
 
+#include <boost/container_hash/hash.hpp>
+
 #include "./Libraries/AStar/AStar.h"
 #include "./Libraries/AStar/Graph/Node.h"
+
 #include "./pddl/include/pddldriver.hh"
 #include "./pddl/include/problem.hh"
 #include "./pddl/include/domain.hh"
@@ -19,11 +22,12 @@ public:
 	{
 		Node node;
 		std::size_t hash;
-		LiteralList* state;
+		LiteralList state;
 
-		PNode(LiteralList* l)
+		PNode(){}
+		PNode(LiteralList l)
 		{
-			hash = std::hash<auto>{}(l);
+			boost::hash_combine(hash, l);
 			state = l;
 			node = Node(hash, 1);
 		}
@@ -38,8 +42,8 @@ public:
 	Planner();
 	Planner(std::string domainFilePath, std::string problemFilePath);
 
-	PNode GeneratePNodeFrom(Action* action, PNode* currentPNode);
-	bool ConditionSatisfied(Action* action, PNode* node);
+	PNode GeneratePNodeFrom(Action& action, PNode& currentPNode);
+	bool ConditionSatisfied(Action& action, PNode& node);
 	void GenerateGraph();
 	void FindBestPath();
 };
@@ -49,49 +53,57 @@ Planner::Planner(std::string domainFilePath, std::string problemFilePath)
 	parser.parse(domainFilePath);
 	parser.parse(problemFilePath);
 
-	initPNode = PNode(parser._init);
-	goalPNode = PNode(parser._goal);
+	initPNode = Planner::PNode(*(parser.problem->_init));
+	goalPNode = Planner::PNode(*(parser.problem->_goal));
 }
 
-PNode Planner::GeneratePNodeFrom(Action action, PNode* currentPNode)
+Planner::PNode Planner::GeneratePNodeFrom(Action& action, Planner::PNode& currentPNode)
 {
-	LiteralList resultList = currentPNode->state;
+	LiteralList resultList = currentPNode.state;
 
 	// Apply action effect to currentPNode state
 	// by appending effects and remove duplicates
-	resultList.insert(resultList.end(), action->EffectList.begin(), action->EffectList.end());
+	resultList.insert(resultList.end(), action._effects->begin(), action._effects->end());
 	
-	auto end = resultList.end();
-	for (auto const& literal : resultList) 
+	for (auto literal = resultList.begin(); literal != resultList.end(); literal++) 
 	{
 		// Remove duplicates
-		end = std::remove(literal + 1, end, literal);
+		std::remove(literal + 1, resultList.end(), *literal);
 
 		// Find opposite and remove opposite duplicates
-		auto literalOpposite = Literal(literal.first, !literal.second);
+		auto literalOpposite = Literal((*literal)->first, !(*literal)->second);
 		bool containsOpposite = std::find(resultList.begin(), resultList.end(), literalOpposite) != resultList.end();
 
 		if (containsOpposite)
 		{
-			end = std::remove(literal + 1, end, literalOpposite);
-			end = std::replace(literal, literal, literalOpposite);
+			std::remove(literal + 1, resultList.end(), &literalOpposite);
+			std::replace(literal, literal + 1, *literal, &literalOpposite);
 		}
+
+		resultList.erase(literal, resultList.end());
 	}
-	resultList.erase(end, resultList.end());
+
+	
 
 	// Return altered currentPNode
 	PNode resultNode(resultList);
 
 	// Generate & store edge
-	Edge e(currentPNode->node, &resultNode.node);
-	currentPNode->node.paths.push_back(e);
+	Edge e(&currentPNode.node, &resultNode.node);
+	currentPNode.node.paths.push_back(e);
 
 	return resultNode;
 }
 
-bool Planner::ConditionSatisfied(Action* action, PNode* node)
+bool Planner::ConditionSatisfied(Action& action, PNode& node)
 {
-	bool result = node->state.contains(action._precond);
+	// Only copy of pointers, okay in this case because read-only
+	LiteralList preconditionCopy = *(action._precond);
+	LiteralList stateCopy = node.state;
+
+	std::sort(preconditionCopy.begin(), preconditionCopy.end());
+    std::sort(stateCopy.begin(), stateCopy.end());
+    bool result = std::includes(preconditionCopy.begin(), preconditionCopy.end(), stateCopy.begin(), stateCopy.end());
 
 	return result;
 }
@@ -105,22 +117,24 @@ void Planner::GenerateGraph()
 	graph.nodes.push_back(&(initPNode.node));
 	s.push(&initPNode);
 
-	PNode* currentPNode = s.pop();
+	PNode* currentPNode = s.top();
+	s.pop();
+
 	// Stops when there's one path find
 	// Needs to be changed later
 	while(!s.empty())
 	{
 		// Each node is a literalList hash
 		// Each edge is an action
-		for (auto const& action : parser.domain._actions) 
+		for (auto action : *(parser.domain->_actions)) 
 		{
 			PNode nextPNode;
 
 			// Enumerate applicable actions
-			if (action._precond.isSatisfiedBy(currentPNode))
+			if (ConditionSatisfied(*action, *currentPNode))
 			{
 				// Generate nodes from those actions and store in graph
-				nextPNode = GeneratePNodeFrom(action, currentPNode);
+				nextPNode = GeneratePNodeFrom(*action, *currentPNode);
 				
 				graph.nodes.push_back(&(nextPNode.node));
 				s.push(&nextPNode);
@@ -128,13 +142,14 @@ void Planner::GenerateGraph()
 		}
 
 		//Pop node 		
-		currentPNode = s.pop();
+		currentPNode = s.top();
+		s.pop();
 	}
 }
 
 void Planner::FindBestPath()
 {
-	astar.FindPath(initPNode.node, goalPNode.node);
+	astar.FindPath(&initPNode.node, &goalPNode.node);
 }
 
 #endif
