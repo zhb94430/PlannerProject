@@ -5,7 +5,4 @@ set(CMAKE_BUILD_TYPE Debug)
 
 project(PlannerProject CXX)
 
-include_directories(pddl/include/)
-include_directories(Libraries/AStar/)
-
 add_subdirectory(Tests/)

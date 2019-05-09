@@ -1,5 +1,5 @@
-#include "pddldriver.hh"
-#include "pddlparser.tab.hh"
+#include <pddldriver.hh>
+#include <pddlparser.tab.hh>
 
 using namespace std;
 

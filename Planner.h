@@ -8,8 +8,8 @@
 
 #include <boost/container_hash/hash.hpp>
 
-#include "./Libraries/AStar/AStar.h"
-#include "./Libraries/AStar/Graph/Node.h"
+#include <AStar.h>
+#include <Graph/Node.h>
 
 #include "./pddl/include/pddldriver.hh"
 #include "./pddl/include/problem.hh"
@@ -72,7 +72,7 @@ Planner::PNode Planner::GeneratePNodeFrom(Action& action, Planner::PNode& curren
 
 		// Find opposite and remove opposite duplicates
 		auto literalOpposite = Literal((*literal)->first, !(*literal)->second);
-		bool containsOpposite = std::find(resultList.begin(), resultList.end(), literalOpposite) != resultList.end();
+		bool containsOpposite = std::find(resultList.begin(), resultList.end(), &literalOpposite) != resultList.end();
 
 		if (containsOpposite)
 		{

@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <string>
 
+#include <AStar.h>
+#include <Graph/Node.h>
+
 #include "../Planner.h"
 
 TEST_CASE("GRIPPER")
